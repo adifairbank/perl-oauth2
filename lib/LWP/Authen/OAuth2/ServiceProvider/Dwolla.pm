@@ -5,24 +5,24 @@ use warnings;
 
 use base qw/LWP::Authen::OAuth2::ServiceProvider/;
 
-use JSON qw/decode_json/;
+use UUID;
 
 
 sub authorization_endpoint {
     my $self = shift;
-    my $host = $self->{use_test_urls} ? 'uat.dwolla.com' : 'www.dwolla.com';
+    my $host = $self->{use_test_urls} ? 'sandbox.dwolla.com' : 'www.dwolla.com';
     return 'https://'.$host.'/oauth/v2/authenticate';
 }
 
 sub token_endpoint {
     my $self = shift;
-    my $host = $self->{use_test_urls} ? 'uat.dwolla.com' : 'www.dwolla.com';
+    my $host = $self->{use_test_urls} ? 'sandbox.dwolla.com' : 'www.dwolla.com';
     return 'https://'.$host.'/oauth/v2/token';
 }
 
 sub api_url_base {
     my $self = shift;
-    my $host = $self->{use_test_urls} ? 'api-uat.dwolla.com' : 'api.dwolla.com';
+    my $host = $self->{use_test_urls} ? 'api-sandbox.dwolla.com' : 'api.dwolla.com';
     return 'https://'.$host;
 }
 
@@ -37,7 +37,18 @@ sub authorization_optional_params {
 }
 
 sub default_api_headers {
-    return { 'Content-Type' => 'application/vnd.dwolla.v1.hal+json', 'Accept' => 'application/vnd.dwolla.v1.hal+json' };
+    return {
+        'Content-Type'    => 'application/vnd.dwolla.v1.hal+json',
+        'Accept'          => 'application/vnd.dwolla.v1.hal+json',
+        'Idempotency-Key' => lc _get_uuid(),
+    };
+}
+
+sub _get_uuid {
+    my ($uuid_val, $uuid);
+    UUID::generate($uuid_val);
+    UUID::unparse($uuid_val, $uuid);
+    return $uuid;
 }
 
 =head1 NAME
@@ -52,7 +63,7 @@ LWP::Authen::OAuth2::ServiceProvider::Dwolla - Access Dwolla API v2
     client_id        => DWOLLA_APP_KEY,
     client_secret    => DWOLLA_APP_SECRET,
     service_provider => 'Dwolla',
-    # $use_test = 1 to use uat.dwolla.com in your dev sandbox, for test transactions
+    # $use_test = 1 to use sandbox.dwolla.com in your dev sandbox, for test transactions
     use_test_urls    => $use_test ? 1 : 0,
     redirect_uri     => 'http://my.host/dwolla_redirect_handler',
     # scope for reading funding sources and sending money; see Dwolla docs for other scopes

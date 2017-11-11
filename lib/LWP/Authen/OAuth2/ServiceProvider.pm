@@ -207,6 +207,18 @@ sub post_to_token_endpoint {
 
 sub api_url_base { return '' } # override in subclass
 
+sub api_error_description {
+    my ($self, $response) = @_;
+    my $errors = decode_json($response->content);
+    my $combined_error = $errors->{'code'}."<br/>\n".$errors->{'message'};
+    if ($errors->{'_embedded'}) {
+        foreach my $emb_err (@{ $errors->{'_embedded'}->{'errors'} }) {
+            $combined_error .= "<br/>\n<br/>\n".$emb_err->{'code'}.': '.$emb_err->{'message'}.' [ path='.$emb_err->{'path'}.' ]';
+        }
+    }
+    return $combined_error;
+}
+
 sub access_token_class {
     my ($self, $type) = @_;
 

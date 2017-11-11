@@ -179,14 +179,20 @@ sub make_api_call {
     my $url = $uri =~ m|^http| ? $uri : $self->api_url_base.$uri;
     if ($self->{service_provider}->can('default_api_headers')) {
         my $service_provider_headers = $self->{service_provider}->default_api_headers;
-        $headers = ref $headers eq 'HASH' ? { %$headers, %$service_provider_headers } : $service_provider_headers || {};
+        $headers = ref $headers eq 'HASH' ? { %$service_provider_headers, %$headers } : $service_provider_headers || {};
     }
 
     my $response = $params ? $self->post($url, Content => encode_json($params), %$headers) : $self->get($url, %$headers);
 
-    if (! $response->is_success()) {
-        #$self->error('failed call to: '.$url.'; status_line='.$response->status_line.'; full error='.$response->error_as_HTML.'; content='.$response->content);
-        $self->{'_api_call_error'} = $response->error_as_HTML || $response->status_line;
+    if ($response->is_error()) {
+        $self->{'_api_call_error_code'} = $response->code();
+        if ($response->is_client_error()) {
+            # 4xx errors provided by ServiceProvider
+            $self->{'_api_call_error_description'} = $self->{service_provider}->api_error_description($response);
+        } else {
+            # 5xx errors, e.g. RequestTimeout, provided by LWP
+            $self->{'_api_call_error_description'} = $response->error_as_HTML || $response->status_line;
+        }
         return undef;
     }
 
@@ -195,7 +201,12 @@ sub make_api_call {
     return eval { decode_json($content) }; # return decoded JSON if response has a body
 }
 
-sub api_call_error { return shift->{'_api_call_error'}; }
+sub api_call_error_code        { return shift->{'_api_call_error_code'};        }
+sub api_call_error_description { return shift->{'_api_call_error_description'}; }
+sub api_call_error {
+    my $self = shift;
+    return join(': ', $self->{'_api_call_error_code'}||(), $self->{'_api_call_error_description'}||());
+}
 
 sub request_tokens {
     my ($self, %opts) = @_;
