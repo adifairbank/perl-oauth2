@@ -7,6 +7,7 @@ use warnings;
 use Carp qw(croak confess);
 # LWP::UserAgent lazyloads these, but we always need it.
 use HTTP::Request::Common;
+use HTTP::Status qw/:is/;
 use JSON qw(encode_json decode_json);
 use LWP::UserAgent;
 use Module::Load qw(load);
@@ -167,11 +168,12 @@ sub make_api_call {
         $headers = ref $headers eq 'HASH' ? { %$service_provider_headers, %$headers } : $service_provider_headers || {};
     }
 
-    my $response = $params ? $self->post($url, Content => encode_json($params), %$headers) : $self->get($url, %$headers);
+    my $response = $self->{'_http_response'} =
+      $params ? $self->post($url, Content => encode_json($params), %$headers) : $self->get($url, %$headers);
 
     if ($response->is_error()) {
         $self->{'_api_call_error_code'} = $response->code();
-        if ($response->is_client_error()) {
+        if (is_client_error( $self->{'_api_call_error_code'} )) {
             # 4xx errors provided by ServiceProvider
             $self->{'_api_call_error_description'} = $self->{service_provider}->api_error_description($response);
         } else {
@@ -186,6 +188,7 @@ sub make_api_call {
     return eval { decode_json($content) }; # return decoded JSON if response has a body
 }
 
+sub api_call_response          { return shift->{'_http_response'};              }
 sub api_call_error_code        { return shift->{'_api_call_error_code'};        }
 sub api_call_error_description { return shift->{'_api_call_error_description'}; }
 sub api_call_error {
